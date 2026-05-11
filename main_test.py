@@ -64,26 +64,66 @@ TTS_MODEL_NAME = "gemini-2.5-flash-preview-tts"
 ################################# test the audio generation block
 
 
+# import json
+
+# text_data = []
+# DATA_PATH = "data/synthetic_text_dataset.jsonl"
+
+# with open(DATA_PATH, "r", encoding="utf-8") as f:
+#     for line in f:
+#         text_data.append(json.loads(line))
+
+# # print(text_data)
+
+
+# client = genai.Client(api_key=GEMINI_API_KEY)
+
+# audio_gen_service = AudioGenerationTTSService(
+#     client=client,
+#     tts_model_name=TTS_MODEL_NAME,
+#     output_dir="data/audio_outputs",
+#     jsonl_path="data/synthetic_audio_dataset.jsonl",
+#     max_concurrent_tasks=10,
+# )
+
+# asyncio.run(audio_gen_service.generate_parallel(text_data[0:4]))
+
+
+#####################################################
+#####################################################
+#####################################################
+
 import json
+from src.review_and_eval_block.data_validation_service import AudioValidationService
 
-text_data = []
-DATA_PATH = "data/synthetic_text_dataset.jsonl"
 
+# Load your dataset
+DATA_PATH = "data/synthetic_audio_dataset.jsonl"
 with open(DATA_PATH, "r", encoding="utf-8") as f:
-    for line in f:
-        text_data.append(json.loads(line))
+    records = [json.loads(line) for line in f]
 
-# print(text_data)
 
+# Initialize validation service
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-audio_gen_service = AudioGenerationTTSService(
-    client=client,
-    tts_model_name=TTS_MODEL_NAME,
-    output_dir="data/audio_outputs",
-    jsonl_path="data/synthetic_audio_dataset.jsonl",
-    max_concurrent_tasks=10,
+validator = AudioValidationService(
+    gemini_client=client,
+    accepted_jsonl="data/accepted.jsonl",
+    rejected_jsonl="data/rejected.jsonl",
 )
 
-asyncio.run(audio_gen_service.generate_parallel(text_data[0:4]))
+
+# Validate in parallel
+results = asyncio.run(validator.validate_parallel(records[0:5]))
+
+
+# Verify outputs
+with open("data/accepted.jsonl", "r", encoding="utf-8") as f:
+    accepted = [json.loads(line) for line in f]
+
+with open("data/rejected.jsonl", "r", encoding="utf-8") as f:
+    rejected = [json.loads(line) for line in f]
+
+print(f"Accepted samples: {len(accepted)}")
+print(f"Rejected samples: {len(rejected)}")
