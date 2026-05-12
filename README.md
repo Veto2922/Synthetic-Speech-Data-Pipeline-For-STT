@@ -51,7 +51,7 @@ Core principles:
 Egyptian Arabic introduces real challenges for STT systems:
 
 | Challenge                | Solution                       |
-| ------------------------ | ------------------------------ |          |
+| ------------------------ | ------------------------------ |          
 | informal grammar         | LLM prompt constraints         |
 | code-switching           | structured metadata            |
 | numeric ambiguity        | numbers written as words       |
