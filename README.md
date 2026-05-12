@@ -1,12 +1,5 @@
-تمام — دي نسخة **README نهائية مصقولة (Professional Case Study Style)** جاهزة تحطها على GitHub أو تبعتها كـ submission. ركزت فيها على الـ system thinking، وحطيت بوضوح جدًا:
 
-* emotional speech synthesis
-* multi-speaker design
-* background noise realism for STT robustness
-
----
-
-# 🧠 Synthetic Speech Data Pipeline for STT (S.S.D.P)
+# Synthetic Speech Data Pipeline for STT (S.S.D.P)
 
 ## Overview
 
