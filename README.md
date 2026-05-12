@@ -21,9 +21,7 @@ This pipeline explicitly models these factors to improve STT robustness.
 
 # 🏗️ High-Level Architecture
 
-```text id="pipeline_arch"
-Text Generation → Speech Synthesis → Review Layer → Audio Augmentation → Dataset Formatting
-```
+<img width="1864" height="383" alt="image" src="https://github.com/user-attachments/assets/57df4e15-0643-41c0-ac89-444987d4f5ab" />
 
 Each stage is:
 
@@ -40,7 +38,6 @@ This system was designed as a **data-centric AI pipeline**, not just a generatio
 
 Core principles:
 
-* STT-first design (not TTS-first)
 * realistic acoustic simulation
 * modular pipeline architecture
 * reproducibility & fault tolerance
@@ -54,8 +51,7 @@ Core principles:
 Egyptian Arabic introduces real challenges for STT systems:
 
 | Challenge                | Solution                       |
-| ------------------------ | ------------------------------ |
-| multiple spellings       | normalization layer            |
+| ------------------------ | ------------------------------ |          |
 | informal grammar         | LLM prompt constraints         |
 | code-switching           | structured metadata            |
 | numeric ambiguity        | numbers written as words       |
@@ -70,6 +66,9 @@ Egyptian Arabic introduces real challenges for STT systems:
 
 # 1. 📝 Text Generation Stage
 
+<img width="608" height="832" alt="image" src="https://github.com/user-attachments/assets/b3d0fdcd-11f1-4c3f-8157-5cdaba1e0ad6" />
+
+
 Generates structured Egyptian Arabic prompts using LLMs.
 
 ### Key Features:
@@ -78,6 +77,7 @@ Generates structured Egyptian Arabic prompts using LLMs.
 * Egyptian Arabic-only enforcement
 * controlled domain sampling (delivery, support, etc.)
 * metadata-rich output
+* async and batchin 
 
 ### Output Example:
 
@@ -93,6 +93,9 @@ Generates structured Egyptian Arabic prompts using LLMs.
 ---
 
 # 2. 🎤 Speech Synthesis Stage (TTS)
+
+<img width="665" height="835" alt="image" src="https://github.com/user-attachments/assets/29d3fbc3-0f5c-4d15-a6af-a214d7442ce1" />
+
 
 This stage converts text into synthetic speech using a TTS system.
 
@@ -115,6 +118,7 @@ Instead, each sample is conditioned with emotional context such as:
 ---
 
 ### 🗣️ 2. Multi-Speaker Design
+
 
 The system supports **multiple synthetic speakers**, not a single voice.
 
@@ -176,6 +180,9 @@ They typically face:
 
 # 3. 🔍 Review & Quality Control Layer
 
+<img width="667" height="767" alt="image" src="https://github.com/user-attachments/assets/04575c10-a51c-43c8-b670-d25351f75a4e" />
+
+
 Ensures only high-quality samples enter training.
 
 ### Includes:
@@ -187,7 +194,10 @@ Ensures only high-quality samples enter training.
 
 ---
 
-# 4. 🌫️ Audio Augmentation Stage
+# 4. 🌫️ Adding background noise Stage
+
+<img width="565" height="844" alt="image" src="https://github.com/user-attachments/assets/136ca5f7-2035-4435-9422-f546664a88e8" />
+
 
 Enhances dataset realism further.
 
@@ -207,6 +217,9 @@ Enhances dataset realism further.
 ---
 
 # 5. 📦 Dataset Formatting Stage
+
+<img width="673" height="849" alt="image" src="https://github.com/user-attachments/assets/93c8b7ef-3eac-40ac-aa43-a03042332b11" />
+
 
 Converts pipeline output into **training-ready STT format**.
 
