@@ -898,3 +898,478 @@ The implementation prioritizes:
 * Training-readiness
 
 while keeping the architecture extensible for future improvements such as augmentation, validation, and automated review systems.
+
+
+---
+
+
+
+# Synthetic Speech Data Augmentation Pipeline for STT
+
+## Overview
+
+This module is responsible for **audio augmentation and dataset finalization** for Speech-to-Text (STT) training.
+
+The goal is to transform validated synthetic speech samples into a more realistic and production-ready dataset by:
+
+* Adding realistic background noise
+* Generating augmented audio variations
+* Preserving original clean samples
+* Preventing duplicate augmentations
+* Building a final scalable metadata dataset
+* Increasing acoustic diversity for robust STT training
+
+---
+
+# Pipeline Architecture
+
+```text
+                 ┌─────────────────────┐
+                 │ accepted.jsonl      │
+                 │ validated samples   │
+                 └──────────┬──────────┘
+                            │
+                            ▼
+              ┌──────────────────────────┐
+              │ AudioAugmentationService │
+              └──────────┬───────────────┘
+                         │
+         ┌───────────────┼────────────────┐
+         │                                │
+         ▼                                ▼
+ ┌─────────────────┐            ┌──────────────────┐
+ │ Clean Audio     │            │ Noisy Audio      │
+ │ Keep Original   │            │ Add Noise        │
+ └────────┬────────┘            └────────┬─────────┘
+          │                              │
+          ▼                              ▼
+ ┌─────────────────┐          ┌─────────────────────┐
+ │ Save Metadata   │          │ Generate New WAV    │
+ │ with_noise=False│          │ *_with_noise.wav    │
+ └────────┬────────┘          └────────┬────────────┘
+          │                              │
+          └──────────────┬───────────────┘
+                         ▼
+          ┌────────────────────────────┐
+          │ final_dataset_metadata.jsonl │
+          └────────────────────────────┘
+```
+
+---
+
+# Main Objective
+
+Synthetic TTS audio is usually:
+
+* Too clean
+* Too perfect
+* Missing environmental variability
+
+This hurts STT model generalization in real-world scenarios.
+
+This augmentation pipeline solves this by introducing:
+
+* Street noise
+* Crowd noise
+* Realistic acoustic conditions
+* Signal-to-noise variations
+
+This significantly improves:
+
+* Robustness
+* Noise tolerance
+* Real-world transcription quality
+
+---
+
+# Core Components
+
+## 1. Input Dataset
+
+The pipeline starts from:
+
+```text
+accepted.jsonl
+```
+
+This file contains only validated audio samples that already passed:
+
+* Audio quality validation
+* STT verification
+* WER filtering
+
+Each record contains:
+
+```json
+{
+  "audio_id": "...",
+  "audio_path": "...",
+  "text": "...",
+  "background_noise": "background crowd"
+}
+```
+
+---
+
+# 2. Noise Mapping System
+
+The pipeline maps semantic noise labels to actual WAV files.
+
+Example:
+
+```python
+NOISE_MAP = {
+    "background street noise": "street_noise.wav",
+    "background crowd": "crowd_noise.wav",
+}
+```
+
+This design allows easy extension with new environments:
+
+* Cafe noise
+* Car noise
+* Airport announcements
+* Office ambience
+* Rain
+* Keyboard typing
+
+---
+
+# 3. Audio Augmentation Engine
+
+The augmentation engine:
+
+1. Loads clean speech
+2. Loads noise audio
+3. Resamples noise if needed
+4. Randomly crops noise
+5. Scales noise using SNR
+6. Mixes speech + noise
+7. Normalizes final waveform
+8. Saves augmented audio
+
+Generated file naming:
+
+```text
+original.wav
+→
+original_with_noise.wav
+```
+
+---
+
+# 4. SNR-Based Mixing
+
+The system uses:
+
+```text
+Signal-to-Noise Ratio (SNR)
+```
+
+to control noise intensity.
+
+Example:
+
+```python
+snr_db = 10
+```
+
+Lower SNR:
+
+* harder audio
+* more realistic
+* noisier speech
+
+Higher SNR:
+
+* cleaner audio
+* easier transcription
+
+This creates controllable difficulty levels for STT training.
+
+---
+
+# 5. Metadata Finalization
+
+All records are saved into:
+
+```text
+final_dataset_metadata.jsonl
+```
+
+This file becomes the final training manifest.
+
+It contains:
+
+* Original clean samples
+* Augmented noisy samples
+* Augmentation metadata
+* Parent-child relationships
+
+Example:
+
+```json
+{
+  "audio_id": "abc_with_noise",
+  "parent_audio_id": "abc",
+  "with_noise": true,
+  "augmentation": {
+    "type": "background_noise",
+    "noise_type": "background crowd",
+    "snr_db": 10
+  }
+}
+```
+
+---
+
+# Duplicate Prevention System
+
+One major challenge in dataset pipelines is:
+
+```text
+Repeated augmentation
+```
+
+Without protection:
+
+```text
+sample.wav
+→ sample_with_noise.wav
+→ sample_with_noise_with_noise.wav
+```
+
+This pipeline prevents this using:
+
+## Existing Audio ID Cache
+
+At startup:
+
+```python
+load_existing_audio_ids()
+```
+
+loads all processed IDs from:
+
+```text
+final_dataset_metadata.jsonl
+```
+
+Then before augmentation:
+
+```python
+if new_audio_id in EXISTING_AUDIO_IDS:
+    skip
+```
+
+This guarantees:
+
+* Idempotent processing
+* Safe reruns
+* No duplicate metadata
+* No duplicated WAV generation
+
+---
+
+# Key Features
+
+## Fast and Lightweight
+
+Optimizations include:
+
+* `resample_poly()` for efficient resampling
+* Random noise cropping
+* Minimal memory overhead
+* JSONL streaming
+
+---
+
+## Modular Architecture
+
+Utilities are separated from the service layer.
+
+### Utils
+
+* Audio processing
+* JSONL handling
+* Noise mixing
+* Existing ID loading
+
+### Service Class
+
+Responsible for orchestration:
+
+* dataset iteration
+* augmentation logic
+* metadata management
+* logging
+
+This improves:
+
+* maintainability
+* testing
+* scalability
+
+---
+
+# Logging System
+
+The pipeline uses Loguru for structured logging.
+
+Example logs:
+
+```text
+INFO  Starting augmentation
+INFO  Adding background noise
+SUCCESS Augmented sample created
+WARNING Sample already exists
+ERROR Noise file missing
+```
+
+This makes debugging and monitoring significantly easier.
+
+---
+
+# Why This Pipeline is Useful for STT
+
+## 1. Improves Generalization
+
+Models trained only on clean TTS data fail in real environments.
+
+Noise augmentation helps the model learn:
+
+* robustness
+* speech separation
+* noisy phoneme recognition
+
+---
+
+## 2. Simulates Real-World Conditions
+
+The pipeline introduces realistic acoustic variability.
+
+Examples:
+
+* crowd conversations
+* traffic
+* outdoor environments
+
+This makes training data closer to production data.
+
+---
+
+## 3. Increases Dataset Diversity
+
+From one validated sample:
+
+```text
+clean version
++
+noisy version
+```
+
+This effectively expands the dataset size and variability.
+
+---
+
+## 4. Safer Training Data Generation
+
+The pipeline ensures:
+
+* no corrupted duplicate records
+* reproducible augmentation
+* traceable metadata
+* parent-child sample tracking
+
+---
+
+# Recommended Future Improvements
+
+## Multi-SNR Augmentation
+
+Generate multiple difficulty levels:
+
+```text
+sample_snr5.wav
+sample_snr10.wav
+sample_snr20.wav
+```
+
+---
+
+## Parallel Processing
+
+Use:
+
+* asyncio
+* multiprocessing
+* thread pools
+
+to speed up augmentation on large datasets.
+
+---
+
+## Additional Augmentations
+
+Possible future augmentations:
+
+* Reverberation
+* Speed perturbation
+* Pitch shifting
+* Echo simulation
+* Codec compression
+* Telephone simulation
+
+---
+
+## Dataset Versioning
+
+Add:
+
+```json
+"dataset_version": "v2"
+```
+
+for reproducibility and experiment tracking.
+
+---
+
+# Final Result
+
+The pipeline produces:
+
+## Audio Files
+
+```text
+audio_outputs/
+├── sample.wav
+├── sample_with_noise.wav
+```
+
+## Metadata
+
+```text
+final_dataset_metadata.jsonl
+```
+
+Containing:
+
+* clean samples
+* noisy samples
+* augmentation metadata
+* validation information
+
+---
+
+# Final Benefits
+
+This architecture provides:
+
+* scalable STT dataset generation
+* realistic noisy speech simulation
+* duplicate-safe augmentation
+* modular clean design
+* production-friendly metadata tracking
+* efficient dataset expansion
+* improved STT robustness and generalization
+

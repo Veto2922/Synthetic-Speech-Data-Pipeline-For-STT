@@ -93,37 +93,78 @@ TTS_MODEL_NAME = "gemini-2.5-flash-preview-tts"
 #####################################################
 #####################################################
 
+# import json
+# from src.review_and_eval_block.data_validation_service import AudioValidationService
+
+
+# # Load your dataset
+# DATA_PATH = "data/synthetic_audio_dataset.jsonl"
+# with open(DATA_PATH, "r", encoding="utf-8") as f:
+#     records = [json.loads(line) for line in f]
+
+
+# # Initialize validation service
+
+# client = genai.Client(api_key=GEMINI_API_KEY)
+
+# validator = AudioValidationService(
+#     gemini_client=client,
+#     accepted_jsonl="data/accepted.jsonl",
+#     rejected_jsonl="data/rejected.jsonl",
+# )
+
+
+# # Validate in parallel
+# results = asyncio.run(validator.validate_parallel(records[0:5]))
+
+
+# # Verify outputs
+# with open("data/accepted.jsonl", "r", encoding="utf-8") as f:
+#     accepted = [json.loads(line) for line in f]
+
+# with open("data/rejected.jsonl", "r", encoding="utf-8") as f:
+#     rejected = [json.loads(line) for line in f]
+
+# print(f"Accepted samples: {len(accepted)}")
+# print(f"Rejected samples: {len(rejected)}")
+
+
+################################### test the add background noise block ################################
+
+# pyrefly: ignore [missing-import]
+from src.add_background_noise_block.audio_augmentation_service import (
+    AudioAugmentationService,
+)
+
+
 import json
-from src.review_and_eval_block.data_validation_service import AudioValidationService
+from pathlib import Path
+
+
+BASE_DIR = Path.cwd()
+
+
+NOISE_MAP = {
+    "background street noise": "street_noise.wav",
+    "background crowd": "crowd_noise.wav",
+}
+
+
+FINAL_METADATA_PATH = Path("data/final_dataset_metadata.jsonl")
 
 
 # Load your dataset
-DATA_PATH = "data/synthetic_audio_dataset.jsonl"
+DATA_PATH = "data/accepted.jsonl"
 with open(DATA_PATH, "r", encoding="utf-8") as f:
     records = [json.loads(line) for line in f]
 
 
-# Initialize validation service
-
-client = genai.Client(api_key=GEMINI_API_KEY)
-
-validator = AudioValidationService(
-    gemini_client=client,
-    accepted_jsonl="data/accepted.jsonl",
-    rejected_jsonl="data/rejected.jsonl",
+augmentation_service = AudioAugmentationService(
+    metadata_output_path=FINAL_METADATA_PATH,
+    noise_dir=BASE_DIR / "data/background_noise",
+    noise_map=NOISE_MAP,
+    snr_db=10,
+    base_dir=BASE_DIR,
 )
 
-
-# Validate in parallel
-results = asyncio.run(validator.validate_parallel(records[0:5]))
-
-
-# Verify outputs
-with open("data/accepted.jsonl", "r", encoding="utf-8") as f:
-    accepted = [json.loads(line) for line in f]
-
-with open("data/rejected.jsonl", "r", encoding="utf-8") as f:
-    rejected = [json.loads(line) for line in f]
-
-print(f"Accepted samples: {len(accepted)}")
-print(f"Rejected samples: {len(rejected)}")
+augmentation_service.augment_dataset(records[0:5])
