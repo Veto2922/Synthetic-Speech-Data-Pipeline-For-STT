@@ -31,8 +31,5 @@ RUN uv sync --frozen --no-dev
 # Copy the rest of the application setting the ownership
 COPY --chown=user . .
 
-# Ensure the entrypoint script is executable
-RUN chmod +x entrypoint.sh
-
 # Start both applications using the entrypoint script
 CMD ["uv", "run", "python", "app.py"]
