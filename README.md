@@ -364,7 +364,7 @@ You can also run the entire system using Docker:
 
 ```bash
 # Build the image
-docker build -t ssdp-pipeline .
+docker build -t stt-pipeline .
 
 # Run the container
 docker run -p 7860:7860 --env-file .env ssdp-pipeline
