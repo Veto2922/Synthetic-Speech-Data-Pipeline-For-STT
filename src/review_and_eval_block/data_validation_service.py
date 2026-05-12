@@ -13,6 +13,7 @@ from .validation_utils.stt_verification import (
 from .validation_utils.fast_checks import (
     run_fast_checks,
 )
+from ..utils.load_jsonl import load_jsonl
 
 
 class AudioValidationService:
@@ -21,12 +22,14 @@ class AudioValidationService:
         gemini_client,
         accepted_jsonl="data/accepted.jsonl",
         rejected_jsonl="data/rejected.jsonl",
+        stt_model_name: str = "gemini-2.5-flash-lite",
         min_duration=1.0,
         max_duration=30.0,
         min_rms=0.005,
-        max_wer: float = 0.25,
+        max_wer: float = 0.3,
     ):
         self.gemini_client = gemini_client
+        self.stt_model_name = stt_model_name
 
         self.accepted_jsonl = Path(accepted_jsonl)
         self.rejected_jsonl = Path(rejected_jsonl)
@@ -39,6 +42,26 @@ class AudioValidationService:
         self.max_duration = max_duration
         self.min_rms = min_rms
 
+        # Load already processed IDs to avoid duplicates
+        self.processed_ids = self._load_processed_ids()
+
+    def _load_processed_ids(self) -> set:
+        processed_ids = set()
+        for path in [self.accepted_jsonl, self.rejected_jsonl]:
+            if path.exists():
+                try:
+                    # Using local import if needed or the one from utils
+                    records = load_jsonl(path)
+                    for r in records:
+                        if "audio_id" in r:
+                            processed_ids.add(r["audio_id"])
+                except Exception as e:
+                    logger.warning(f"Could not load processed IDs from {path}: {e}")
+
+        if processed_ids:
+            logger.info(f"Loaded {len(processed_ids)} already processed IDs.")
+        return processed_ids
+
     # =====================================================
     # SAVE JSONL
     # =====================================================
@@ -48,6 +71,10 @@ class AudioValidationService:
 
         with open(output_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(result, ensure_ascii=False) + "\n")
+
+        # Add to processed IDs
+        if "audio_id" in result:
+            self.processed_ids.add(result["audio_id"])
 
     # =====================================================
     # STAGE 1 -> FAST RULE FILTERS
@@ -64,7 +91,11 @@ class AudioValidationService:
 
     async def run_stt_verification(self, audio_path: str, original_text: str):
         return await run_stt_verification(
-            self.gemini_client, audio_path, original_text, self.max_wer
+            self.gemini_client,
+            audio_path,
+            original_text,
+            self.max_wer,
+            self.stt_model_name,
         )
 
     # =====================================================
@@ -114,6 +145,23 @@ class AudioValidationService:
 
         stt_result = await self.run_stt_verification(audio_path, original_text)
 
+        # =====================================
+        # CHECK FOR TRANSIENT ERRORS (503, etc.)
+        # =====================================
+        # If the error is transient, we don't want to save it as rejected.
+        # This allows it to be picked up again in the next run.
+        is_transient = any(
+            "503" in str(issue) or "UNAVAILABLE" in str(issue).upper()
+            for issue in stt_result["issues"]
+        )
+
+        if is_transient:
+            logger.error(
+                f"⚠️ Transient error (503/Unavailable) for sample {record['audio_id']}. "
+                "Skipping saving to allow retry in next run."
+            )
+            return record
+
         accepted = stt_result["passed"]
 
         review_status = "accepted" if accepted else "rejected"
@@ -149,9 +197,20 @@ class AudioValidationService:
     # =====================================================
 
     async def validate_parallel(self, records: list[dict]):
-        logger.info(f"🚀 Starting validation batch | " f"samples={len(records)}")
+        # Filter out already processed records
+        to_process = [r for r in records if r.get("audio_id") not in self.processed_ids]
+        skipped_count = len(records) - len(to_process)
 
-        tasks = [self.validate_sample(r) for r in records]
+        if skipped_count > 0:
+            logger.info(f"⏭️ Skipping {skipped_count} already processed samples.")
+
+        if not to_process:
+            logger.info("✅ All samples in this batch already processed.")
+            return []
+
+        logger.info(f"🚀 Starting validation batch | " f"samples={len(to_process)}")
+
+        tasks = [self.validate_sample(r) for r in to_process]
 
         results = await asyncio.gather(*tasks)
 

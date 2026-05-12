@@ -10,21 +10,25 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from ..utils.normalize_text import normalize_text, validate_no_digits
 
+from .prompts.synthetic_speech_Dataset_generator_prompts import (
+    SYSTEM_PROMPT,
+)
 
-class SyntheticSpeechDatasetGenerator:
+from .shcemas.synthetic_llm_generator_shcema import (
+    LLMGeneratedSchema,
+)
+
+
+class SyntheticTextDatasetGenerator:
     def __init__(
         self,
-        structured_model,
-        schema_class,
-        system_prompt: str,
+        model,
         model_name: str,
         schema_version: str = "1.0",
         output_file: str = "dataset_output.jsonl",
         max_concurrent_tasks: int = 10,
     ):
-        self.structured_model = structured_model
-        self.schema_class = schema_class
-        self.system_prompt = system_prompt
+        self.structured_model = model.with_structured_output(LLMGeneratedSchema)
         self.model_name = model_name
         self.schema_version = schema_version
 
@@ -64,7 +68,7 @@ class SyntheticSpeechDatasetGenerator:
         # -------------------------
         # Schema validation
         # -------------------------
-        validated = self.schema_class(**raw_data)
+        validated = LLMGeneratedSchema(**raw_data)
 
         speaker_id = random.choice(["1", "2", "3", "4"])
 
@@ -92,7 +96,7 @@ class SyntheticSpeechDatasetGenerator:
             logger.info(f"🚀 Generating sample | topic={topic}")
 
             messages = [
-                SystemMessage(content=self.system_prompt),
+                SystemMessage(content=SYSTEM_PROMPT),
                 HumanMessage(content=f"Generate one sample about topic: {topic}"),
             ]
 
@@ -207,7 +211,7 @@ class SyntheticSpeechDatasetGenerator:
 
                 for topic in batch_categories:
                     messages = [
-                        SystemMessage(content=self.system_prompt),
+                        SystemMessage(content=SYSTEM_PROMPT),
                         HumanMessage(
                             content=f"Generate one sample about topic: {topic}"
                         ),

@@ -20,7 +20,7 @@ class AudioGenerationTTSService:
         tts_model_name="gemini-2.5-flash-preview-tts",
         output_dir="data/audio_outputs",
         jsonl_path="data/synthetic_audio_dataset.jsonl",
-        max_concurrent_tasks=10,
+        max_concurrent_tasks=5,
     ):
         self.client = client
 

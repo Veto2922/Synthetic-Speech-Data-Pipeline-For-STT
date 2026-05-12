@@ -1373,3 +1373,479 @@ This architecture provides:
 * efficient dataset expansion
 * improved STT robustness and generalization
 
+
+
+# README — STT Dataset Formatting Pipeline
+
+## Overview
+
+After generating and validating synthetic speech data, the next step is preparing the dataset in a format compatible with Speech-to-Text (STT) training frameworks such as:
+
+* Whisper
+* Hugging Face Transformers
+* NeMo
+* ESPnet
+* SpeechBrain
+
+This module converts:
+
+```text
+final_dataset_metadata.jsonl
+```
+
+plus all generated WAV files into a clean, training-ready dataset.
+
+---
+
+# Why We Need a Formatting Stage
+
+Raw synthetic pipelines usually produce:
+
+* scattered audio files
+* inconsistent sample rates
+* mixed audio channels
+* metadata in JSONL format
+* paths tied to internal pipelines
+
+Training frameworks require:
+
+* standardized audio format
+* clean directory layout
+* unified metadata schema
+* stable relative paths
+
+This formatting layer solves that.
+
+---
+
+# Selected Dataset Format
+
+## Final Structure
+
+```text
+ready_dataset/
+├── metadata.csv
+└── wavs/
+    ├── sample_000001.wav
+    ├── sample_000002.wav
+    └── ...
+```
+
+---
+
+# Why This Format Was Chosen
+
+This structure is widely compatible with modern STT pipelines.
+
+## Advantages
+
+### 1. Whisper Compatibility
+
+Whisper training pipelines commonly use:
+
+```csv
+audio,transcription
+```
+
+style metadata.
+
+---
+
+### 2. Hugging Face Datasets Compatibility
+
+Easy loading using:
+
+```python
+datasets.load_dataset(...)
+```
+
+or Pandas.
+
+---
+
+### 3. Simple and Scalable
+
+CSV metadata is:
+
+* lightweight
+* streamable
+* easy to debug
+* easy to edit manually
+
+---
+
+### 4. Portable
+
+The dataset becomes fully self-contained.
+
+You can:
+
+* zip it
+* upload to Hugging Face
+* train locally
+* move across machines
+
+without changing paths.
+
+---
+
+# Final Metadata Schema
+
+## metadata.csv
+
+| audio                  | transcription        |
+| ---------------------- | -------------------- |
+| wavs/sample_000001.wav | مرحبا كيف حالك       |
+| wavs/sample_000002.wav | أريد طلب بيتزا كبيرة |
+
+---
+
+# Audio Standardization
+
+The formatter provides configurable preprocessing:
+
+| Feature         | Purpose                    |
+| --------------- | -------------------------- |
+| Resampling      | Standardize sample rate    |
+| Mono conversion | Reduce training complexity |
+| Normalization   | Stable audio amplitude     |
+| WAV export      | Maximum STT compatibility  |
+
+---
+
+# Recommended Audio Settings
+
+## Recommended for Whisper
+
+| Setting     | Value    |
+| ----------- | -------- |
+| Sample Rate | 16000 Hz |
+| Channels    | Mono     |
+| Format      | WAV      |
+| PCM         | 16-bit   |
+
+---
+
+# Why 16kHz Mono?
+
+Most STT systems are optimized for:
+
+```text
+16kHz mono speech
+```
+
+Benefits:
+
+* lower storage
+* faster training
+* lower VRAM usage
+* reduced preprocessing complexity
+* standard speech frequency coverage
+
+Human speech intelligibility mainly lies below:
+
+```text
+8kHz
+```
+
+Thus:
+
+```text
+16kHz sample rate
+```
+
+is usually sufficient.
+
+---
+
+# Pipeline Architecture
+
+```text
+final_dataset_metadata.jsonl
+            │
+            ▼
+ ┌─────────────────────────┐
+ │ DatasetFormatterService │
+ └────────────┬────────────┘
+              │
+    ┌─────────┼──────────┐
+    │                    │
+    ▼                    ▼
+Read Metadata      Process Audio
+                         │
+                         ▼
+              ┌──────────────────┐
+              │ Resample Audio   │
+              │ Convert to Mono  │
+              │ Normalize        │
+              └────────┬─────────┘
+                       │
+                       ▼
+               Save WAV Files
+                       │
+                       ▼
+             Generate metadata.csv
+                       │
+                       ▼
+                 ready_dataset/
+```
+
+---
+
+# Processing Flow
+
+## Step 1 — Load Metadata
+
+Read:
+
+```text
+final_dataset_metadata.jsonl
+```
+
+Each record contains:
+
+* audio path
+* transcription
+* metadata
+* augmentation info
+
+---
+
+## Step 2 — Validate Audio
+
+Check:
+
+* file exists
+* readable audio
+* non-empty transcription
+
+---
+
+## Step 3 — Audio Standardization
+
+Each audio file is:
+
+### Resampled
+
+Example:
+
+```python
+target_sample_rate = 16000
+```
+
+---
+
+### Converted to Mono
+
+Stereo:
+
+```text
+[L, R]
+```
+
+becomes:
+
+```text
+(L + R) / 2
+```
+
+---
+
+### Normalized
+
+Prevents:
+
+* clipping
+* unstable loudness
+
+---
+
+## Step 4 — Save Final WAV
+
+Files are renamed into stable sequential names:
+
+```text
+sample_000001.wav
+sample_000002.wav
+```
+
+This avoids:
+
+* OS path issues
+* UUID complexity
+* duplicate naming problems
+
+---
+
+## Step 5 — Generate metadata.csv
+
+The formatter generates:
+
+```csv
+audio,transcription
+```
+
+mapping every audio file to its transcript.
+
+---
+
+# Why Sequential File Names?
+
+Instead of:
+
+```text
+759c7a5b-78a7.wav
+```
+
+we use:
+
+```text
+sample_000001.wav
+```
+
+Benefits:
+
+* cleaner datasets
+* easier debugging
+* deterministic ordering
+* easier sharding
+
+---
+
+# Configurable Features
+
+The formatter should support configurable parameters.
+
+## Example
+
+```python
+formatter = DatasetFormatterService(
+    target_sample_rate=16000,
+    mono=True,
+    normalize_audio=True,
+)
+```
+
+---
+
+# Recommended Future Extensions
+
+## Train / Validation / Test Split
+
+Automatically generate:
+
+```text
+train.csv
+valid.csv
+test.csv
+```
+
+---
+
+## Hugging Face Export
+
+Direct export into:
+
+```python
+DatasetDict
+```
+
+---
+
+## Duration Filtering
+
+Remove:
+
+* too short clips
+* too long clips
+
+---
+
+## Language Filtering
+
+Support multilingual datasets.
+
+---
+
+## Dataset Statistics
+
+Generate:
+
+* total hours
+* average duration
+* vocabulary size
+* speaker distribution
+
+---
+
+# Example Final Dataset
+
+```text
+ready_dataset/
+├── metadata.csv
+└── wavs/
+    ├── sample_000001.wav
+    ├── sample_000002.wav
+    ├── sample_000003.wav
+    └── sample_000004.wav
+```
+
+metadata.csv
+
+```csv
+audio,transcription
+wavs/sample_000001.wav,السلام عليكم
+wavs/sample_000002.wav,أريد كوب قهوة
+```
+
+---
+
+# Key Benefits of This Design
+
+## Framework Agnostic
+
+Works with nearly all STT frameworks.
+
+---
+
+## Production Ready
+
+Clean separation between:
+
+* metadata
+* audio
+* augmentation pipeline
+
+---
+
+## Easy to Scale
+
+Supports:
+
+* millions of files
+* distributed storage
+* cloud training
+
+---
+
+## Reproducible
+
+Deterministic naming + CSV metadata.
+
+---
+
+# Final Goal
+
+This formatting stage transforms synthetic validated audio into:
+
+```text
+A clean, standardized, training-ready STT dataset
+```
+
+suitable for:
+
+* Whisper fine-tuning
+* Arabic ASR training
+* multilingual speech models
+* noisy speech robustness training
+* production-grade STT pipelines

@@ -132,8 +132,49 @@ TTS_MODEL_NAME = "gemini-2.5-flash-preview-tts"
 ################################### test the add background noise block ################################
 
 # pyrefly: ignore [missing-import]
-from src.add_background_noise_block.audio_augmentation_service import (
-    AudioAugmentationService,
+# from src.add_background_noise_block.audio_augmentation_service import (
+#     AudioAugmentationService,
+# )
+
+
+# import json
+# from pathlib import Path
+
+
+# BASE_DIR = Path.cwd()
+
+
+# NOISE_MAP = {
+#     "background street noise": "street_noise.wav",
+#     "background crowd": "crowd_noise.wav",
+# }
+
+
+# FINAL_METADATA_PATH = Path("data/final_dataset_metadata.jsonl")
+
+
+# # Load your dataset
+# DATA_PATH = "data/accepted.jsonl"
+# with open(DATA_PATH, "r", encoding="utf-8") as f:
+#     records = [json.loads(line) for line in f]
+
+
+# augmentation_service = AudioAugmentationService(
+#     metadata_output_path=FINAL_METADATA_PATH,
+#     noise_dir=BASE_DIR / "data/background_noise",
+#     noise_map=NOISE_MAP,
+#     snr_db=10,
+#     base_dir=BASE_DIR,
+# )
+
+# augmentation_service.augment_dataset(records[0:5])
+
+
+################ test the dataset formatter block ################
+
+
+from src.data_formating_block.dataset_formatter_service import (
+    DatasetFormatterService,
 )
 
 
@@ -141,30 +182,25 @@ import json
 from pathlib import Path
 
 
-BASE_DIR = Path.cwd()
+BASE_DIR = Path(__file__).resolve().parent
+
+INPUT_METADATA_PATH = BASE_DIR / "data/final_dataset_metadata.jsonl"
+
+OUTPUT_DATASET_DIR = BASE_DIR / "data" / "dataset"
+
+OUTPUT_WAV_DIR = OUTPUT_DATASET_DIR / "wavs"
+
+METADATA_CSV_PATH = OUTPUT_DATASET_DIR / "metadata.csv"
 
 
-NOISE_MAP = {
-    "background street noise": "street_noise.wav",
-    "background crowd": "crowd_noise.wav",
-}
-
-
-FINAL_METADATA_PATH = Path("data/final_dataset_metadata.jsonl")
-
-
-# Load your dataset
-DATA_PATH = "data/accepted.jsonl"
-with open(DATA_PATH, "r", encoding="utf-8") as f:
-    records = [json.loads(line) for line in f]
-
-
-augmentation_service = AudioAugmentationService(
-    metadata_output_path=FINAL_METADATA_PATH,
-    noise_dir=BASE_DIR / "data/background_noise",
-    noise_map=NOISE_MAP,
-    snr_db=10,
+formatter = DatasetFormatterService(
+    metadata_path=INPUT_METADATA_PATH,
+    output_dataset_dir=OUTPUT_DATASET_DIR,
     base_dir=BASE_DIR,
+    metadata_csv_path=METADATA_CSV_PATH,
+    target_sample_rate=16000,
+    mono=True,
+    normalize=True,
 )
 
-augmentation_service.augment_dataset(records[0:5])
+formatter.build_dataset()

@@ -190,6 +190,7 @@ class AudioAugmentationService:
             # SAVE
             # =====================================
 
+            save_to_jsonl(self.metadata_output_path, original_record)
             save_to_jsonl(self.metadata_output_path, augmented_record)
 
             self.existing_audio_ids.add(augmented_audio_id)
