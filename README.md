@@ -7,6 +7,9 @@ The Synthetic Speech Data Pipeline (S.S.D.P) is an end-to-end system designed to
 
 The main objective is not only to synthesize speech, but to **simulate real-world acoustic conditions** that STT systems encounter in production.
 
+<img width="1905" height="514" alt="image" src="https://github.com/user-attachments/assets/7d32d505-4587-41be-9395-38c66934b70c" />
+
+
 In real environments, speech is rarely clean — it includes:
 
 * emotions
